@@ -2,101 +2,50 @@ package com.codepath.apps.twitterclient;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.ListView;
 import android.widget.Toast;
 
+import com.astuetz.PagerSlidingTabStrip;
+import com.codepath.apps.twitterclient.fragments.HomeTimelineFragment;
+import com.codepath.apps.twitterclient.fragments.MentionsTimelineFragment;
 import com.codepath.apps.twitterclient.models.Tweet;
-import com.codepath.apps.twitterclient.models.User;
 import com.loopj.android.http.JsonHttpResponseHandler;
 
 import org.apache.http.Header;
-import org.json.JSONArray;
 import org.json.JSONObject;
-
-import java.util.ArrayList;
 
 public class TimelineActivity extends AppCompatActivity {
 
-    private TwitterClient client;
-    private ArrayList<Tweet> tweets;
-    private TweetsArrayAdapter aTweets;
-    private ListView lvTweets;
-    private User self;
     private Tweet newTweet;
+    TwitterClient client;
+    ViewPager viewPager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timeline);
+        client = TwitterApplication.getRestClient();
 
-        lvTweets = (ListView) findViewById(R.id.lvTweets);
-        tweets = new ArrayList<>();
-        aTweets = new TweetsArrayAdapter(this, tweets);
-        lvTweets.setAdapter(aTweets);
-        lvTweets.setOnScrollListener(new EndlessScrollListener() {
-            @Override
-            public boolean onLoadMore(int page, int totalItemsCount) {
-                populateTimelineMore();
-                return true;
-            }
-        });
+        // Get the viewPager
+        viewPager = (ViewPager) findViewById(R.id.viewpager) ;
+        viewPager.setAdapter(new TweetsPagerAdapter(getSupportFragmentManager()));
 
-        client = TwitterApplication.getRestClient();//singleton
-        getSelfUser();
-        populateTimeline();
+        PagerSlidingTabStrip tabStrip = (PagerSlidingTabStrip) findViewById(R.id.tabs);
+        tabStrip.setViewPager(viewPager);
     }
 
-    private void getSelfUser() {
-        client.getUser(28515992, new JsonHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                self = User.fromJson(response);
-            }
-
-            @Override
-            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                Log.d("Debug", errorResponse.toString());
-            }
-        });
-    }
-
-    private void populateTimeline() {
-        client.getHomeTimeline(new JsonHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONArray json) {
-                //Toast.makeText(TimelineActivity.this, json.toString(), Toast.LENGTH_SHORT).show();
-                Log.d("Debug", json.toString());
-                aTweets.clear();
-                aTweets.addAll(Tweet.fromJsonArray(json));
-            }
-
-            @Override
-            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                Log.d("Debug", errorResponse.toString());
-            }
-        });
-    }
-
-    private void populateTimelineMore() {
-        long last = tweets.get(tweets.size()-1).getUid();
-        client.getHomeTimelineMore(last, new JsonHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONArray json) {
-                //Toast.makeText(TimelineActivity.this, json.toString(), Toast.LENGTH_SHORT).show();
-                Log.d("Debug", json.toString());
-
-                aTweets.addAll(Tweet.fromJsonArray(json));
-            }
-
-            @Override
-            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                Log.d("Debug", errorResponse.toString());
-            }
-        });
+    public void onProfileView (MenuItem item) {
+        Intent i = new Intent(this, ProfileActivity.class);
+        String screenName = "dullcat2008";
+        i.putExtra("screen_name", screenName);
+        startActivity(i);
     }
 
     @Override
@@ -121,6 +70,37 @@ public class TimelineActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    public class TweetsPagerAdapter extends FragmentPagerAdapter {
+        private String tabTitles[] = {"Home", "Mentions"};
+
+        public TweetsPagerAdapter (FragmentManager fm) {
+            super(fm);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            if (position == 0) {
+                return new HomeTimelineFragment();
+            } else if (position == 1) {
+                return new MentionsTimelineFragment();
+            }
+
+            return null;
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            return tabTitles[position];
+        }
+
+        @Override
+        public int getCount() {
+            return tabTitles.length;
+        }
+    }
+
+
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         Tweet tweet = (Tweet) data.getSerializableExtra("tweet");
@@ -133,17 +113,35 @@ public class TimelineActivity extends AppCompatActivity {
 
     }
 
+    private static String makeFragmentName(int viewId, int position) {
+        return "android:switcher:" + viewId + ":" + position;
+    }
     private void sendTweet(String status) {
         client.postTweet(status, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                newTweet = Tweet.fromJson(response);
-                //Toast.makeText(TimelineActivity.this, response.toString(), Toast.LENGTH_SHORT).show();
                 Toast.makeText(TimelineActivity.this, "Tweeting succeeded!", Toast.LENGTH_SHORT).show();
                 Log.d("Debug", response.toString());
-                tweets.clear();
-                aTweets.notifyDataSetChanged();
-                populateTimeline();
+                //tweets.clear();
+                //aTweets.notifyDataSetChanged();
+                //int id = viewPager.getCurrentItem();
+                //TweetsListFragment fragment = (TweetsListFragment) getSupportFragmentManager().findFragmentById(id);
+                //fragment.populateTimelinePublic();
+                //FragmentTransaction fts = getSupportFragmentManager().beginTransaction();
+                // Replace the content of the container
+                //fts.replace(R.id.flContainer, new HomeTimelineFragment());
+                // Append this transaction to the backstack
+                //fts.addToBackStack("optional tag");
+                // Commit the changes
+                //fts.commit();
+
+                String name = makeFragmentName(viewPager.getId(), 0);
+                HomeTimelineFragment fragment = (HomeTimelineFragment) getSupportFragmentManager().findFragmentByTag(name);
+                getSupportFragmentManager().findFragmentById(0);
+
+                FragmentPagerAdapter fragmentPagerAdapter = (FragmentPagerAdapter) viewPager.getAdapter();
+                //HomeTimelineFragment fragment = (HomeTimelineFragment) fragmentPagerAdapter.getItem(0);
+                fragment.populateTimeline();
 
             }
 
@@ -158,9 +156,11 @@ public class TimelineActivity extends AppCompatActivity {
     public void onComposeAction(MenuItem item) {
         Toast.makeText(this, "Compose!", Toast.LENGTH_SHORT).show();
         Intent i = new Intent(this, ComposeActivity.class);
-        i.putExtra("user", self);
+        String screenName = "dullcat2008";
+        i.putExtra("screen_name", screenName);
+
         startActivityForResult(i, 200);
 
-        populateTimeline();
+        //populateTimeline();
     }
 }
